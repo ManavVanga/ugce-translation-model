@@ -1,0 +1,8 @@
+{
+  "base_dir": "/content/drive/MyDrive/UGCE_Translation_Model/v2_translation_dataset",
+  "registry_dir": "/content/drive/MyDrive/UGCE_Translation_Model/v2_translation_dataset/collection/literature_registry",
+  "extraction_dir": "/content/drive/MyDrive/UGCE_Translation_Model/v2_translation_dataset/collection/literature_extraction",
+  "curated_dir": "/content/drive/MyDrive/UGCE_Translation_Model/v2_translation_dataset/curated",
+  "logs_dir": "/content/drive/MyDrive/UGCE_Translation_Model/v2_translation_dataset/logs",
+  "runs_dir": "/content/drive/MyDrive/UGCE_Translation_Model/v2_translation_dataset/runs"
+}
