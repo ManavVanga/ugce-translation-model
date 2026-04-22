@@ -1,11 +1,9 @@
 import requests
-import json
-import time
 import os
 import pandas as pd
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from src.utils.config import load_drive_paths
+from src.utils.config import load_runtime_config, get_base_output_dir
 
 # ------------------------------------------------------------
 # CONFIG
@@ -28,7 +26,7 @@ def search_pubmed(query, max_results=10):
         "sort": "date"
     }
 
-    response = requests.get(url, params=params)
+    response = requests.get(url, params=params, timeout=30)
     response.raise_for_status()
 
     data = response.json()
@@ -43,7 +41,7 @@ def fetch_details(pmids):
         "retmode": "xml"
     }
 
-    response = requests.get(url, params=params)
+    response = requests.get(url, params=params, timeout=30)
     response.raise_for_status()
 
     return response.text
@@ -180,10 +178,15 @@ def infer_true_study_type(title, abstract):
 # ------------------------------------------------------------
 if __name__ == "__main__":
     print("Loading config...")
-    paths = load_drive_paths()
+    runtime = load_runtime_config()
+    base_output_dir = get_base_output_dir()
 
-    registry_dir = paths["registry_dir"]
-    logs_dir = paths["logs_dir"]
+    print("Runtime config:", runtime)
+    print("Base output dir:", base_output_dir)
+
+    registry_dir = os.path.join(base_output_dir, "collection", "literature_registry")
+    logs_dir = os.path.join(base_output_dir, "logs")
+
     os.makedirs(registry_dir, exist_ok=True)
     os.makedirs(logs_dir, exist_ok=True)
 
