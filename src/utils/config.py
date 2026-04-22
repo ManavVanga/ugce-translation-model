@@ -1,21 +1,44 @@
 import json
 import os
 
-def load_drive_paths():
-    """
-    Load Google Drive paths from config file
-    """
-    base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    config_path = os.path.join(base_path, "configs", "drive_paths.json")
+
+def _repo_root():
+    return os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
+
+def load_json_config(relative_path):
+    repo_root = _repo_root()
+    config_path = os.path.join(repo_root, relative_path)
 
     with open(config_path, "r") as f:
-        paths = json.load(f)
+        return json.load(f)
 
-    return paths
+
+def load_drive_paths():
+    return load_json_config(os.path.join("configs", "drive_paths.json"))
+
+
+def load_runtime_config():
+    return load_json_config(os.path.join("configs", "runtime_config.json"))
+
+
+def get_base_output_dir():
+    runtime = load_runtime_config()
+
+    storage_mode = runtime.get("storage_mode", "github").strip().lower()
+
+    if storage_mode == "colab":
+        return runtime["colab_output_dir"]
+
+    return runtime["github_output_dir"]
 
 
 if __name__ == "__main__":
-    paths = load_drive_paths()
-    print("Loaded Drive paths:")
-    for k, v in paths.items():
-        print(f"{k}: {v}")
+    print("Drive paths:")
+    print(load_drive_paths())
+
+    print("\nRuntime config:")
+    print(load_runtime_config())
+
+    print("\nBase output dir:")
+    print(get_base_output_dir())
