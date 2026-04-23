@@ -1,4 +1,5 @@
 import os
+import json
 import pandas as pd
 from src.utils.config import get_base_output_dir
 from src.qc.qc_engine import run_full_qc
@@ -16,24 +17,41 @@ if __name__ == "__main__":
     )
 
     if not os.path.exists(registry_path):
-        raise FileNotFoundError("Registry file not found")
+        raise FileNotFoundError(f"Registry file not found: {registry_path}")
 
     print("Loading registry...")
     df = pd.read_csv(registry_path)
 
-    print("Running QC...")
+    print("Running locked-schema QC...")
     df_qc = run_full_qc(df)
 
-    qc_path = os.path.join(
-        base_dir,
-        "curated",
-        "translation_dataset_qc_v1.csv"
-    )
+    curated_dir = os.path.join(base_dir, "curated")
+    os.makedirs(curated_dir, exist_ok=True)
 
-    os.makedirs(os.path.dirname(qc_path), exist_ok=True)
+    qc_path = os.path.join(curated_dir, "translation_dataset_qc_v1.csv")
+    summary_path = os.path.join(curated_dir, "translation_dataset_qc_summary_v1.json")
+
     df_qc.to_csv(qc_path, index=False)
 
-    print("Routing PASS / FAIL...")
+    summary = {
+        "total_rows": int(len(df_qc)),
+        "pass_rows": int((df_qc["qc_overall_status"] == "PASS").sum()),
+        "review_rows": int((df_qc["qc_overall_status"] == "REVIEW").sum()),
+        "fail_rows": int((df_qc["qc_overall_status"] == "FAIL").sum()),
+        "schema_pass": int((df_qc["qc_schema_pass"] == "PASS").sum()),
+        "format_pass": int((df_qc["qc_format_pass"] == "PASS").sum()),
+        "biological_pass": int((df_qc["qc_biological_pass"] == "PASS").sum()),
+        "linkage_pass": int((df_qc["qc_linkage_pass"] == "PASS").sum()),
+        "evidence_pass": int((df_qc["qc_evidence_pass"] == "PASS").sum()),
+    }
+
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=2)
+
+    print("Routing PASS / REVIEW / FAIL...")
     route_by_qc(df_qc, base_dir)
 
     print("QC COMPLETE")
+    print("QC file:", qc_path)
+    print("Summary file:", summary_path)
+    print("Summary:", summary)
