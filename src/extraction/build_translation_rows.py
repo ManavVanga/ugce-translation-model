@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from src.utils.config import get_base_output_dir
 from src.extraction.row_builder import build_translation_rows
+from src.extraction.normalizers import normalize_translation_rows
 
 
 if __name__ == "__main__":
@@ -23,11 +24,14 @@ if __name__ == "__main__":
     print("Building row-level translation records...")
     row_df = build_translation_rows(extract_df)
 
+    print("Applying normalization layer...")
+    row_df = normalize_translation_rows(row_df)
+
     out_dir = os.path.join(base_dir, "collection")
     os.makedirs(out_dir, exist_ok=True)
 
     output_path = os.path.join(out_dir, "translation_row_candidates_v1.csv")
     row_df.to_csv(output_path, index=False)
 
-    print("Saved row candidates:", output_path)
+    print("Saved normalized row candidates:", output_path)
     print(row_df.head())
