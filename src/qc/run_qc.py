@@ -9,17 +9,17 @@ from src.qc.router import route_by_qc
 if __name__ == "__main__":
     base_dir = get_base_output_dir()
 
-    candidate_path = os.path.join(
+    master_path = os.path.join(
         base_dir,
         "collection",
-        "translation_row_candidates_v1.csv"
+        "translation_row_master_v1.csv"
     )
 
-    if not os.path.exists(candidate_path):
-        raise FileNotFoundError(f"Row candidate file not found: {candidate_path}")
+    if not os.path.exists(master_path):
+        raise FileNotFoundError(f"Master row dataset not found: {master_path}")
 
-    print("Loading row candidates...")
-    df = pd.read_csv(candidate_path)
+    print("Loading master row dataset...")
+    df = pd.read_csv(master_path)
 
     print("Running locked-schema QC...")
     df_qc = run_full_qc(df)
