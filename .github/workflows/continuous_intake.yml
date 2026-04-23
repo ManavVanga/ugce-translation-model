@@ -3,7 +3,7 @@ name: Continuous Paper Intake
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 */6 * * *"   # every 6 hours
+    - cron: "0 * * * *"   # every 1 hour
 
 jobs:
   intake:
@@ -20,10 +20,29 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas requests
+          pip install -r requirements.txt
 
       - name: Run PubMed intake
         env:
           PYTHONPATH: .
         run: |
           python src/intake/pubmed_intake.py
+
+      - name: Upload outputs to Google Drive
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: |
+          python - <<EOF
+import os
+from src.utils.drive_writer import upload_file_to_drive
+
+base_dir = "outputs/collection/literature_registry"
+
+for file in os.listdir(base_dir):
+    if file.endswith(".csv"):
+        upload_file_to_drive(
+            os.path.join(base_dir, file),
+            os.environ["GOOGLE_DRIVE_FOLDER_ID"]
+        )
+EOF
