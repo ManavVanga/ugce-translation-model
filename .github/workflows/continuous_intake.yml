@@ -1,34 +1,38 @@
-name: Continuous Paper Intake
+name: Continuous Paper Intake + QC
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"   # every 1 hour
+    - cron: "0 * * * *"
 
 jobs:
-  intake:
+  pipeline:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install deps
         run: |
           pip install -r requirements.txt
 
-      - name: Run PubMed intake
+      - name: Run intake
         env:
           PYTHONPATH: .
         run: |
           python src/intake/pubmed_intake.py
 
-      - name: Upload outputs to Google Drive
+      - name: Run QC
+        env:
+          PYTHONPATH: .
+        run: |
+          python src/qc/run_qc.py
+
+      - name: Upload to Drive
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
@@ -37,12 +41,12 @@ jobs:
 import os
 from src.utils.drive_writer import upload_file_to_drive
 
-base_dir = "outputs/collection/literature_registry"
+base = "outputs/curated"
 
-for file in os.listdir(base_dir):
-    if file.endswith(".csv"):
+for f in os.listdir(base):
+    if f.endswith(".csv"):
         upload_file_to_drive(
-            os.path.join(base_dir, file),
+            os.path.join(base, f),
             os.environ["GOOGLE_DRIVE_FOLDER_ID"]
         )
 EOF
