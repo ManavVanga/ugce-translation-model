@@ -64,6 +64,16 @@ jobs:
         run: |
           python src/utils/create_audit_manifest.py
 
+      - name: Validate Apps Script secrets
+        shell: bash
+        env:
+          APPS_SCRIPT_WEBHOOK_URL: ${{ secrets.APPS_SCRIPT_WEBHOOK_URL }}
+          APPS_SCRIPT_UPLOAD_SECRET: ${{ secrets.APPS_SCRIPT_UPLOAD_SECRET }}
+        run: |
+          test -n "$APPS_SCRIPT_WEBHOOK_URL" || (echo "Missing APPS_SCRIPT_WEBHOOK_URL" && exit 1)
+          test -n "$APPS_SCRIPT_UPLOAD_SECRET" || (echo "Missing APPS_SCRIPT_UPLOAD_SECRET" && exit 1)
+          echo "Apps Script secrets are present."
+
       - name: Upload outputs to Google Drive via Apps Script
         env:
           PYTHONPATH: .
