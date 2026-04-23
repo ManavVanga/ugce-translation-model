@@ -1,15 +1,11 @@
 import os
 import json
-import io
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.http import MediaFileUpload
 
 
 def get_drive_service():
-    """
-    Authenticate using service account from GitHub secret
-    """
     creds_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 
     if not creds_json:
@@ -27,9 +23,6 @@ def get_drive_service():
 
 
 def upload_file_to_drive(local_path, drive_folder_id):
-    """
-    Upload file to Google Drive folder
-    """
     service = get_drive_service()
 
     file_name = os.path.basename(local_path)
@@ -39,13 +32,12 @@ def upload_file_to_drive(local_path, drive_folder_id):
         "parents": [drive_folder_id]
     }
 
-    with open(local_path, "rb") as f:
-        media = MediaIoBaseUpload(f, mimetype="text/csv")
+    media = MediaFileUpload(local_path, mimetype="text/csv")
 
-        file = service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id"
-        ).execute()
+    file = service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields="id"
+    ).execute()
 
     print(f"Uploaded to Drive: {file_name}")
