@@ -32,5 +32,4 @@ if __name__ == "__main__":
 
     print("Feature extraction complete")
     print(output_path)
-    print("\nPreview:")
     print(feature_df.head())
