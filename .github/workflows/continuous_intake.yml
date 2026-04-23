@@ -10,9 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -64,38 +66,40 @@ jobs:
 
       - name: Upload outputs to Google Drive
         env:
+          PYTHONPATH: .
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        shell: bash
         run: |
-          python - <<EOF
-import os
-from src.utils.drive_writer import upload_file_to_drive
+          python <<'PYCODE'
+          import os
+          from src.utils.drive_writer import upload_file_to_drive
 
-targets = [
-    "outputs/collection/literature_registry/pubmed_paper_registry_v1.csv",
-    "outputs/collection/literature_registry/pubmed_paper_screening_v1.csv",
-    "outputs/collection/literature_extraction/selected_paper_extraction_v1.csv",
-    "outputs/collection/translation_row_candidates_v1.csv",
-    "outputs/collection/translation_row_master_v1.csv",
-    "outputs/collection/translation_row_duplicates_v1.csv",
-    "outputs/collection/translation_row_append_summary_v1.json",
-    "outputs/curated/translation_dataset_qc_v1.csv",
-    "outputs/curated/translation_dataset_pass_v1.csv",
-    "outputs/curated/translation_dataset_review_v1.csv",
-    "outputs/curated/translation_dataset_fail_v1.csv",
-    "outputs/curated/translation_features_v1.csv",
-    "outputs/curated/translation_dataset_qc_summary_v1.json",
-]
+          targets = [
+              "outputs/collection/literature_registry/pubmed_paper_registry_v1.csv",
+              "outputs/collection/literature_registry/pubmed_paper_screening_v1.csv",
+              "outputs/collection/literature_extraction/selected_paper_extraction_v1.csv",
+              "outputs/collection/translation_row_candidates_v1.csv",
+              "outputs/collection/translation_row_master_v1.csv",
+              "outputs/collection/translation_row_duplicates_v1.csv",
+              "outputs/collection/translation_row_append_summary_v1.json",
+              "outputs/curated/translation_dataset_qc_v1.csv",
+              "outputs/curated/translation_dataset_pass_v1.csv",
+              "outputs/curated/translation_dataset_review_v1.csv",
+              "outputs/curated/translation_dataset_fail_v1.csv",
+              "outputs/curated/translation_features_v1.csv",
+              "outputs/curated/translation_dataset_qc_summary_v1.json",
+          ]
 
-for path in targets:
-    if os.path.exists(path):
-        upload_file_to_drive(path, os.environ["GOOGLE_DRIVE_FOLDER_ID"])
+          for path in targets:
+              if os.path.exists(path):
+                  upload_file_to_drive(path, os.environ["GOOGLE_DRIVE_FOLDER_ID"])
 
-runs_dir = "outputs/runs"
-if os.path.exists(runs_dir):
-    for run_name in os.listdir(runs_dir):
-        run_path = os.path.join(runs_dir, run_name)
-        manifest_path = os.path.join(run_path, "run_manifest_v1.json")
-        if os.path.exists(manifest_path):
-            upload_file_to_drive(manifest_path, os.environ["GOOGLE_DRIVE_FOLDER_ID"])
-EOF
+          runs_dir = "outputs/runs"
+          if os.path.exists(runs_dir):
+              for run_name in os.listdir(runs_dir):
+                  run_path = os.path.join(runs_dir, run_name)
+                  manifest_path = os.path.join(run_path, "run_manifest_v1.json")
+                  if os.path.exists(manifest_path):
+                      upload_file_to_drive(manifest_path, os.environ["GOOGLE_DRIVE_FOLDER_ID"])
+          PYCODE
