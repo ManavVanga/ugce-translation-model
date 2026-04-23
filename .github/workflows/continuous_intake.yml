@@ -64,16 +64,19 @@ jobs:
         run: |
           python src/utils/create_audit_manifest.py
 
-      - name: Upload outputs to Google Drive
+      - name: Upload outputs to Google Drive via Apps Script
         env:
           PYTHONPATH: .
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          APPS_SCRIPT_WEBHOOK_URL: ${{ secrets.APPS_SCRIPT_WEBHOOK_URL }}
+          APPS_SCRIPT_UPLOAD_SECRET: ${{ secrets.APPS_SCRIPT_UPLOAD_SECRET }}
         shell: bash
         run: |
           python <<'PYCODE'
           import os
-          from src.utils.drive_writer import upload_file_to_drive
+          from src.utils.apps_script_uploader import upload_file_via_apps_script
+
+          webhook_url = os.environ["APPS_SCRIPT_WEBHOOK_URL"]
+          secret = os.environ["APPS_SCRIPT_UPLOAD_SECRET"]
 
           targets = [
               "outputs/collection/literature_registry/pubmed_paper_registry_v1.csv",
@@ -93,7 +96,11 @@ jobs:
 
           for path in targets:
               if os.path.exists(path):
-                  upload_file_to_drive(path, os.environ["GOOGLE_DRIVE_FOLDER_ID"])
+                  upload_file_via_apps_script(
+                      local_path=path,
+                      webhook_url=webhook_url,
+                      secret=secret,
+                  )
 
           runs_dir = "outputs/runs"
           if os.path.exists(runs_dir):
@@ -101,5 +108,9 @@ jobs:
                   run_path = os.path.join(runs_dir, run_name)
                   manifest_path = os.path.join(run_path, "run_manifest_v1.json")
                   if os.path.exists(manifest_path):
-                      upload_file_to_drive(manifest_path, os.environ["GOOGLE_DRIVE_FOLDER_ID"])
+                      upload_file_via_apps_script(
+                          local_path=manifest_path,
+                          webhook_url=webhook_url,
+                          secret=secret,
+                      )
           PYCODE
