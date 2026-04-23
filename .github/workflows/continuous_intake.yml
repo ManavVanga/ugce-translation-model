@@ -1,4 +1,4 @@
-name: Full Pipeline (Intake + QC + Features)
+name: Full Pipeline (Intake → Extraction → Rows → QC → Features)
 
 on:
   workflow_dispatch:
@@ -26,6 +26,18 @@ jobs:
         run: |
           python src/intake/pubmed_intake.py
 
+      - name: Extract selected papers
+        env:
+          PYTHONPATH: .
+        run: |
+          python src/intake/selected_paper_extraction.py
+
+      - name: Build row-level translation candidates
+        env:
+          PYTHONPATH: .
+        run: |
+          python src/extraction/build_translation_rows.py
+
       - name: Run QC
         env:
           PYTHONPATH: .
@@ -47,13 +59,17 @@ jobs:
 import os
 from src.utils.drive_writer import upload_file_to_drive
 
-base = "outputs/curated"
+targets = [
+    "outputs/collection/translation_row_candidates_v1.csv",
+    "outputs/curated/translation_dataset_qc_v1.csv",
+    "outputs/curated/translation_dataset_pass_v1.csv",
+    "outputs/curated/translation_dataset_review_v1.csv",
+    "outputs/curated/translation_dataset_fail_v1.csv",
+    "outputs/curated/translation_features_v1.csv",
+    "outputs/curated/translation_dataset_qc_summary_v1.json"
+]
 
-if os.path.exists(base):
-    for f in os.listdir(base):
-        if f.endswith(".csv") or f.endswith(".json"):
-            upload_file_to_drive(
-                os.path.join(base, f),
-                os.environ["GOOGLE_DRIVE_FOLDER_ID"]
-            )
+for path in targets:
+    if os.path.exists(path):
+        upload_file_to_drive(path, os.environ["GOOGLE_DRIVE_FOLDER_ID"])
 EOF
