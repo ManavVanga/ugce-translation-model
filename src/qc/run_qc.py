@@ -9,18 +9,17 @@ from src.qc.router import route_by_qc
 if __name__ == "__main__":
     base_dir = get_base_output_dir()
 
-    registry_path = os.path.join(
+    candidate_path = os.path.join(
         base_dir,
         "collection",
-        "literature_registry",
-        "pubmed_paper_registry_v1.csv"
+        "translation_row_candidates_v1.csv"
     )
 
-    if not os.path.exists(registry_path):
-        raise FileNotFoundError(f"Registry file not found: {registry_path}")
+    if not os.path.exists(candidate_path):
+        raise FileNotFoundError(f"Row candidate file not found: {candidate_path}")
 
-    print("Loading registry...")
-    df = pd.read_csv(registry_path)
+    print("Loading row candidates...")
+    df = pd.read_csv(candidate_path)
 
     print("Running locked-schema QC...")
     df_qc = run_full_qc(df)
@@ -42,7 +41,7 @@ if __name__ == "__main__":
         "format_pass": int((df_qc["qc_format_pass"] == "PASS").sum()),
         "biological_pass": int((df_qc["qc_biological_pass"] == "PASS").sum()),
         "linkage_pass": int((df_qc["qc_linkage_pass"] == "PASS").sum()),
-        "evidence_pass": int((df_qc["qc_evidence_pass"] == "PASS").sum()),
+        "evidence_pass": int((df_qc["qc_evidence_pass"] == "PASS").sum())
     }
 
     with open(summary_path, "w") as f:
