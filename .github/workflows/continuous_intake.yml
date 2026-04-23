@@ -1,4 +1,4 @@
-name: Continuous Paper Intake + QC
+name: Full Pipeline (Intake + QC + Features)
 
 on:
   workflow_dispatch:
@@ -31,6 +31,12 @@ jobs:
           PYTHONPATH: .
         run: |
           python src/qc/run_qc.py
+
+      - name: Run feature extraction
+        env:
+          PYTHONPATH: .
+        run: |
+          python src/extraction/run_feature_extraction.py
 
       - name: Upload to Drive
         env:
