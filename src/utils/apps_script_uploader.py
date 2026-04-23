@@ -17,6 +17,12 @@ def upload_file_via_apps_script(local_path: str, webhook_url: str, secret: str) 
     if not os.path.exists(local_path):
         raise FileNotFoundError(f"File not found: {local_path}")
 
+    if not webhook_url or not webhook_url.strip():
+        raise ValueError("APPS_SCRIPT_WEBHOOK_URL is empty")
+
+    if not secret or not secret.strip():
+        raise ValueError("APPS_SCRIPT_UPLOAD_SECRET is empty")
+
     filename = os.path.basename(local_path)
     mime_type = guess_mime_type(local_path)
 
@@ -33,6 +39,8 @@ def upload_file_via_apps_script(local_path: str, webhook_url: str, secret: str) 
         data=content.encode("utf-8"),
         timeout=120,
     )
-    response.raise_for_status()
-    print(f"Uploaded via Apps Script: {filename}")
+
+    print(f"Upload status for {filename}: {response.status_code}")
     print(response.text)
+
+    response.raise_for_status()
