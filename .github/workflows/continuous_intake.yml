@@ -1,4 +1,4 @@
-name: Full Pipeline (Intake → Extraction → Rows → QC → Features)
+name: Full Pipeline (Intake → Extraction → Normalize → Append → QC → Features)
 
 on:
   workflow_dispatch:
@@ -32,19 +32,25 @@ jobs:
         run: |
           python src/intake/selected_paper_extraction.py
 
-      - name: Build row-level translation candidates
+      - name: Build normalized row-level translation candidates
         env:
           PYTHONPATH: .
         run: |
           python src/extraction/build_translation_rows.py
 
-      - name: Run QC
+      - name: Deduplicate and append to master dataset
+        env:
+          PYTHONPATH: .
+        run: |
+          python src/extraction/append_translation_rows.py
+
+      - name: Run QC on master dataset
         env:
           PYTHONPATH: .
         run: |
           python src/qc/run_qc.py
 
-      - name: Run feature extraction
+      - name: Run feature extraction on PASS dataset
         env:
           PYTHONPATH: .
         run: |
@@ -61,6 +67,9 @@ from src.utils.drive_writer import upload_file_to_drive
 
 targets = [
     "outputs/collection/translation_row_candidates_v1.csv",
+    "outputs/collection/translation_row_master_v1.csv",
+    "outputs/collection/translation_row_duplicates_v1.csv",
+    "outputs/collection/translation_row_append_summary_v1.json",
     "outputs/curated/translation_dataset_qc_v1.csv",
     "outputs/curated/translation_dataset_pass_v1.csv",
     "outputs/curated/translation_dataset_review_v1.csv",
