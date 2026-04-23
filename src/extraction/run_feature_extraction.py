@@ -14,12 +14,12 @@ if __name__ == "__main__":
     )
 
     if not os.path.exists(pass_path):
-        raise FileNotFoundError("PASS dataset not found")
+        raise FileNotFoundError(f"PASS dataset not found: {pass_path}")
 
     print("Loading PASS dataset...")
     df = pd.read_csv(pass_path)
 
-    print("Extracting features...")
+    print("Building biologically richer features...")
     feature_df = build_features(df)
 
     output_path = os.path.join(
@@ -32,3 +32,5 @@ if __name__ == "__main__":
 
     print("Feature extraction complete")
     print(output_path)
+    print("\nPreview:")
+    print(feature_df.head())
