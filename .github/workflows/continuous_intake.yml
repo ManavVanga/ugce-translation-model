@@ -51,7 +51,7 @@ base = "outputs/curated"
 
 if os.path.exists(base):
     for f in os.listdir(base):
-        if f.endswith(".csv"):
+        if f.endswith(".csv") or f.endswith(".json"):
             upload_file_to_drive(
                 os.path.join(base, f),
                 os.environ["GOOGLE_DRIVE_FOLDER_ID"]
