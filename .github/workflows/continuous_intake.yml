@@ -22,11 +22,25 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Show repo tree
+        run: |
+          pwd
+          ls
+          ls src
+          ls src/intake || true
+          ls src/extraction || true
+          ls src/qc || true
+          ls src/utils || true
+
       - name: Run intake
         env:
           PYTHONPATH: .
         run: |
           python src/intake/pubmed_intake.py
+
+      - name: Check outputs after intake
+        run: |
+          find outputs -maxdepth 4 -type f | sort || true
 
       - name: Extract selected papers
         env:
@@ -34,11 +48,21 @@ jobs:
         run: |
           python src/intake/selected_paper_extraction.py
 
+      - name: Check outputs after extraction
+        run: |
+          find outputs -maxdepth 4 -type f | sort || true
+          test -f outputs/collection/literature_extraction/selected_paper_extraction_v1.csv
+
       - name: Build normalized row-level translation candidates
         env:
           PYTHONPATH: .
         run: |
           python src/extraction/build_translation_rows.py
+
+      - name: Check outputs after row building
+        run: |
+          find outputs -maxdepth 4 -type f | sort || true
+          test -f outputs/collection/translation_row_candidates_v1.csv
 
       - name: Deduplicate and append to master dataset
         env:
@@ -46,17 +70,31 @@ jobs:
         run: |
           python src/extraction/append_translation_rows.py
 
+      - name: Check outputs after append
+        run: |
+          find outputs -maxdepth 4 -type f | sort || true
+          test -f outputs/collection/translation_row_master_v1.csv
+
       - name: Run QC on master dataset
         env:
           PYTHONPATH: .
         run: |
           python src/qc/run_qc.py
 
+      - name: Check outputs after QC
+        run: |
+          find outputs -maxdepth 4 -type f | sort || true
+          test -f outputs/curated/translation_dataset_qc_v1.csv
+
       - name: Run feature extraction on PASS dataset
         env:
           PYTHONPATH: .
         run: |
           python src/extraction/run_feature_extraction.py
+
+      - name: Check outputs after feature extraction
+        run: |
+          find outputs -maxdepth 4 -type f | sort || true
 
       - name: Build audit manifest
         env:
@@ -124,3 +162,10 @@ jobs:
                           secret=secret,
                       )
           PYCODE
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pipeline-outputs
+          path: outputs/
