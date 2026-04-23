@@ -1,4 +1,4 @@
-name: Full Pipeline (Intake → Extraction → Normalize → Append → QC → Features)
+name: Full Pipeline (Intake → Extraction → Normalize → Append → QC → Features → Audit)
 
 on:
   workflow_dispatch:
@@ -56,7 +56,13 @@ jobs:
         run: |
           python src/extraction/run_feature_extraction.py
 
-      - name: Upload curated outputs to Google Drive
+      - name: Build audit manifest
+        env:
+          PYTHONPATH: .
+        run: |
+          python src/utils/create_audit_manifest.py
+
+      - name: Upload outputs to Google Drive
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
@@ -66,6 +72,9 @@ import os
 from src.utils.drive_writer import upload_file_to_drive
 
 targets = [
+    "outputs/collection/literature_registry/pubmed_paper_registry_v1.csv",
+    "outputs/collection/literature_registry/pubmed_paper_screening_v1.csv",
+    "outputs/collection/literature_extraction/selected_paper_extraction_v1.csv",
     "outputs/collection/translation_row_candidates_v1.csv",
     "outputs/collection/translation_row_master_v1.csv",
     "outputs/collection/translation_row_duplicates_v1.csv",
@@ -75,10 +84,18 @@ targets = [
     "outputs/curated/translation_dataset_review_v1.csv",
     "outputs/curated/translation_dataset_fail_v1.csv",
     "outputs/curated/translation_features_v1.csv",
-    "outputs/curated/translation_dataset_qc_summary_v1.json"
+    "outputs/curated/translation_dataset_qc_summary_v1.json",
 ]
 
 for path in targets:
     if os.path.exists(path):
         upload_file_to_drive(path, os.environ["GOOGLE_DRIVE_FOLDER_ID"])
+
+runs_dir = "outputs/runs"
+if os.path.exists(runs_dir):
+    for run_name in os.listdir(runs_dir):
+        run_path = os.path.join(runs_dir, run_name)
+        manifest_path = os.path.join(run_path, "run_manifest_v1.json")
+        if os.path.exists(manifest_path):
+            upload_file_to_drive(manifest_path, os.environ["GOOGLE_DRIVE_FOLDER_ID"])
 EOF
