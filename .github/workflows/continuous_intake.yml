@@ -38,7 +38,7 @@ jobs:
         run: |
           python src/extraction/run_feature_extraction.py
 
-      - name: Upload to Drive
+      - name: Upload curated outputs to Google Drive
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
@@ -49,10 +49,11 @@ from src.utils.drive_writer import upload_file_to_drive
 
 base = "outputs/curated"
 
-for f in os.listdir(base):
-    if f.endswith(".csv"):
-        upload_file_to_drive(
-            os.path.join(base, f),
-            os.environ["GOOGLE_DRIVE_FOLDER_ID"]
-        )
+if os.path.exists(base):
+    for f in os.listdir(base):
+        if f.endswith(".csv"):
+            upload_file_to_drive(
+                os.path.join(base, f),
+                os.environ["GOOGLE_DRIVE_FOLDER_ID"]
+            )
 EOF
