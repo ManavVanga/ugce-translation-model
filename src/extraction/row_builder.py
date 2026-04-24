@@ -9,7 +9,11 @@ KNOWN_DRUGS = [
     "cisplatin", "doxorubicin", "paclitaxel", "tamoxifen", "sorafenib",
     "lenvatinib", "imatinib", "acetaminophen", "berberine", "olaparib",
     "niraparib", "rucaparib", "carboplatin", "etoposide", "gemcitabine",
-    "5-fluorouracil", "fluorouracil", "rapamycin", "metformin"
+    "5-fluorouracil", "fluorouracil", "5-fu", "rapamycin", "metformin",
+    "docetaxel", "oxaliplatin", "irinotecan", "topotecan", "gefitinib",
+    "erlotinib", "osimertinib", "afatinib", "crizotinib", "ceritinib",
+    "alectinib", "vemurafenib", "dabrafenib", "trametinib", "palbociclib",
+    "ribociclib", "abemaciclib", "bortezomib", "everolimus", "temsirolimus"
 ]
 
 MODEL_KEYWORDS = {
@@ -28,13 +32,14 @@ TISSUE_KEYWORDS = {
     "ovary": ["ovarian", "ovary"],
     "pancreas": ["pancreatic", "pancreas"],
     "stomach": ["gastric", "stomach"],
+    "colon": ["colon", "colorectal", "intestinal"],
 }
 
 ASSAY_KEYWORDS = {
     "viability": ["viability", "cell viability", "survival"],
     "toxicity": ["toxicity", "cytotoxicity", "dili", "hepatotoxicity"],
     "proliferation": ["proliferation", "growth"],
-    "apoptosis": ["apoptosis"],
+    "apoptosis": ["apoptosis", "cell death"],
     "screening": ["screen", "screening", "drug response", "drug-response"],
 }
 
@@ -64,10 +69,17 @@ def detect_drugs(text):
 
     for d in KNOWN_DRUGS:
         if d.lower() in low:
-            found.add(d.lower())
+            if d.lower() == "5-fu":
+                found.add("5-fluorouracil")
+            else:
+                found.add(d.lower())
 
     for m in re.finditer(DRUG_SUFFIX_RE, text):
         found.add(m.group(0).lower())
+
+    # normalize duplicate synonym
+    if "5-fluorouracil" in found and "fluorouracil" in found:
+        found.discard("fluorouracil")
 
     return sorted(found)
 
@@ -75,16 +87,16 @@ def detect_drugs(text):
 def normalize_conc_to_uM(value, unit):
     try:
         value = float(value)
-    except:
+    except Exception:
         return np.nan
 
-    unit = unit.replace("μ", "µ")
-    if unit in ["µM", "uM"]:
+    unit = str(unit).replace("μ", "µ")
+    if unit in ["µM", "uM", "UM"]:
         return value
     if unit == "nM":
-        return value / 1000
+        return value / 1000.0
     if unit == "mM":
-        return value * 1000
+        return value * 1000.0
     return np.nan
 
 
@@ -102,37 +114,84 @@ def extract_doses(text):
 
 
 def extract_time_hours(text):
-    m = re.search(r"(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|day|days)", text, re.I)
-    if not m:
-        return np.nan
-    val = float(m.group(1))
-    unit = m.group(2).lower()
-    if unit in ["day", "days"]:
-        return val * 24
-    return val
+    patterns = [
+        r"(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours)\b",
+        r"(\d+(?:\.\d+)?)\s*(day|days)\b",
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.I)
+        if m:
+            val = float(m.group(1))
+            unit = m.group(2).lower()
+            if unit in ["day", "days"]:
+                return val * 24.0
+            return val
+    return np.nan
 
 
 def extract_response(text):
-    # IC50 / EC50
-    m = re.search(r"\b(IC50|EC50|GI50)\b\s*[:=]?\s*(\d+(?:\.\d+)?)\s*(nM|uM|µM|μM|mM)", text, re.I)
+    # IC50 / EC50 / GI50 = 1.2 uM
+    m = re.search(
+        r"\b(IC50|IC\s*50|EC50|EC\s*50|GI50|GI\s*50)\b\s*(?:was|were|=|:|of|approximately|about)?\s*([<>~]?\s*\d+(?:\.\d+)?)\s*(nM|uM|µM|μM|mM)",
+        text,
+        re.I
+    )
     if m:
-        metric = m.group(1).upper()
-        val = normalize_conc_to_uM(float(m.group(2)), m.group(3).replace("μ", "µ"))
+        metric = re.sub(r"\s+", "", m.group(1).upper())
+        value_raw = m.group(2).replace(" ", "").replace("<", "").replace(">", "").replace("~", "")
+        val = normalize_conc_to_uM(float(value_raw), m.group(3).replace("μ", "µ"))
         return metric, val, f"{metric}_uM"
 
-    # percent viability / inhibition / reduction
-    m = re.search(r"(\d+(?:\.\d+)?)\s*%\s*(viability|inhibition|reduction|survival|cell death|apoptosis)", text, re.I)
+    # IC50 values ranged from 0.1 to 5 uM
+    m = re.search(
+        r"\b(IC50|IC\s*50|EC50|EC\s*50|GI50|GI\s*50)\b.*?(\d+(?:\.\d+)?)\s*(?:to|-|–)\s*(\d+(?:\.\d+)?)\s*(nM|uM|µM|μM|mM)",
+        text,
+        re.I
+    )
     if m:
-        return m.group(2).lower().replace(" ", "_"), float(m.group(1)), "percent"
+        metric = re.sub(r"\s+", "", m.group(1).upper())
+        avg_raw = (float(m.group(2)) + float(m.group(3))) / 2.0
+        val = normalize_conc_to_uM(avg_raw, m.group(4).replace("μ", "µ"))
+        return metric, val, f"{metric}_uM"
+
+    # 50% viability / 70% inhibition / 40% reduction
+    m = re.search(
+        r"(\d+(?:\.\d+)?)\s*%\s*(viability|cell viability|inhibition|growth inhibition|reduction|survival|cell death|apoptosis)",
+        text,
+        re.I
+    )
+    if m:
+        metric = m.group(2).lower().replace(" ", "_")
+        return metric, float(m.group(1)), "percent"
+
+    # viability reduced by 40%
+    m = re.search(
+        r"(viability|cell viability|growth|proliferation|survival|apoptosis|cell death).*?(reduced|decreased|increased|inhibited|suppressed|enhanced).*?(\d+(?:\.\d+)?)\s*%",
+        text,
+        re.I
+    )
+    if m:
+        metric = m.group(1).lower().replace(" ", "_")
+        return metric, float(m.group(3)), "percent"
+
+    # reduced viability to 35%
+    m = re.search(
+        r"(reduced|decreased|increased|inhibited|suppressed|enhanced).*?(viability|cell viability|growth|proliferation|survival|apoptosis|cell death).*?(\d+(?:\.\d+)?)\s*%",
+        text,
+        re.I
+    )
+    if m:
+        metric = m.group(2).lower().replace(" ", "_")
+        return metric, float(m.group(3)), "percent"
 
     return "", np.nan, ""
 
 
 def infer_effect_direction(text):
     low = text.lower()
-    if any(k in low for k in ["decreased", "reduced", "inhibited", "suppressed", "cytotoxic", "killed"]):
+    if any(k in low for k in ["decreased", "reduced", "reduction", "inhibited", "suppressed", "cytotoxic", "killed", "lowered"]):
         return "decrease"
-    if any(k in low for k in ["increased", "enhanced", "promoted"]):
+    if any(k in low for k in ["increased", "enhanced", "promoted", "elevated"]):
         return "increase"
     return ""
 
@@ -160,20 +219,23 @@ def infer_species(text):
 
 
 def confidence(row):
-    score = 0
-    for col, weight in {
-        "drug_name_standard": 0.2,
+    score = 0.0
+    weights = {
+        "drug_name_standard": 0.20,
         "vitro_system_class": 0.15,
-        "tissue_context": 0.1,
-        "assay_type": 0.1,
+        "tissue_context": 0.10,
+        "assay_type": 0.10,
         "dose_normalized_uM": 0.15,
         "exposure_time_hours": 0.05,
-        "response_value_standard": 0.2,
+        "response_value_standard": 0.20,
         "outcome_level": 0.05,
-    }.items():
+    }
+
+    for col, weight in weights.items():
         val = row.get(col, "")
         if not pd.isna(val) and str(val).strip() != "":
             score += weight
+
     return round(min(score, 0.99), 2)
 
 
@@ -185,13 +247,23 @@ def build_translation_rows(extract_df):
         pmid = paper.get("pmid", "")
         title = clean(paper.get("title", ""))
         abstract = clean(paper.get("abstract", ""))
+
+        priority_text = clean(paper.get("pmc_priority_text", ""))
         fulltext = clean(paper.get("pmc_fulltext", ""))
 
-        text = f"{title}. {abstract}. {fulltext[:80000]}"
+        if priority_text:
+            text = f"{title}. {abstract}. {priority_text[:120000]}"
+        else:
+            text = f"{title}. {abstract}. {fulltext[:120000]}"
+
+        if not text.strip():
+            text = f"{title}. {abstract}."
+
         sentences = split_sentences(text)
 
         for i, sent in enumerate(sentences):
-            window = " ".join(sentences[max(0, i-1): min(len(sentences), i+2)])
+            window = " ".join(sentences[max(0, i - 2): min(len(sentences), i + 3)])
+
             drugs = detect_drugs(window)
             doses = extract_doses(window)
             resp_metric, resp_value, resp_standard = extract_response(window)
@@ -199,6 +271,7 @@ def build_translation_rows(extract_df):
             if not drugs:
                 continue
 
+            # Require at least dose OR response.
             if not doses and pd.isna(resp_value):
                 continue
 
@@ -216,12 +289,12 @@ def build_translation_rows(extract_df):
             for drug in drugs:
                 for d in doses:
                     row = {
-                        "record_id": f"PMID_{pmid}_{len(rows)+1:06d}",
+                        "record_id": f"PMID_{pmid}_{len(rows) + 1:06d}",
                         "study_id": paper_id,
                         "source_database": paper.get("source_database", "PubMed/PMC"),
                         "source_url": paper.get("pubmed_url", ""),
                         "data_added_date": paper.get("data_added_date", ""),
-                        "curated_by": "auto_multirow_extractor_v2",
+                        "curated_by": "auto_multirow_fulltext_extractor_v2",
                         "review_status": "auto_extracted",
                         "study_type": paper.get("manual_true_study_type", ""),
 
