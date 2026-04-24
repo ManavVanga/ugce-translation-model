@@ -21,11 +21,14 @@ if __name__ == "__main__":
     print("Loading selected paper extraction file...")
     extract_df = pd.read_csv(extraction_path)
 
-    print("Building row-level translation records...")
+    print("Building multi-row biological translation records...")
     row_df = build_translation_rows(extract_df)
 
-    print("Applying normalization layer...")
-    row_df = normalize_translation_rows(row_df)
+    print("Rows generated:", len(row_df))
+
+    if len(row_df) > 0:
+        print("Applying normalization layer...")
+        row_df = normalize_translation_rows(row_df)
 
     out_dir = os.path.join(base_dir, "collection")
     os.makedirs(out_dir, exist_ok=True)
