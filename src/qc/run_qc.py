@@ -2,9 +2,7 @@ import os
 import json
 import pandas as pd
 from datetime import datetime
-
 from src.utils.config import get_base_output_dir
-from src.qc.qc_engine import run_qc
 
 
 QC_COLUMNS = [
@@ -21,6 +19,124 @@ QC_COLUMNS = [
     "qc_overall_status",
     "qc_overall_reason",
 ]
+
+
+def is_filled(row, col):
+    if col not in row.index:
+        return False
+    val = row[col]
+    if pd.isna(val):
+        return False
+    return str(val).strip() != ""
+
+
+def run_qc(df):
+    qc_rows = []
+
+    for _, row in df.iterrows():
+        r = row.copy()
+
+        required = [
+            "record_id",
+            "paper_id",
+            "pmid",
+            "drug_name_standard",
+            "vitro_system_class",
+            "assay_type",
+            "dose_normalized_uM",
+            "outcome_level",
+        ]
+
+        missing = [c for c in required if not is_filled(row, c)]
+
+        response_present = (
+            is_filled(row, "response_value_standard")
+            and is_filled(row, "response_metric_standard")
+        )
+
+        evidence_present = (
+            is_filled(row, "evidence_sentence")
+            or is_filled(row, "evidence_window")
+        )
+
+        qc_schema_pass = len(missing) == 0
+        qc_format_pass = True
+        qc_biological_pass = response_present
+        qc_linkage_pass = is_filled(row, "paper_id") and is_filled(row, "pmid")
+        qc_evidence_pass = evidence_present
+
+        r["qc_schema_pass"] = "PASS" if qc_schema_pass else "FAIL"
+        r["qc_schema_reason"] = "" if qc_schema_pass else "missing:" + ",".join(missing)
+
+        r["qc_format_pass"] = "PASS"
+        r["qc_format_reason"] = ""
+
+        r["qc_biological_pass"] = "PASS" if qc_biological_pass else "FAIL"
+        r["qc_biological_reason"] = "" if qc_biological_pass else "missing_response_value_or_metric"
+
+        r["qc_linkage_pass"] = "PASS" if qc_linkage_pass else "FAIL"
+        r["qc_linkage_reason"] = "" if qc_linkage_pass else "missing_paper_or_pmid"
+
+        r["qc_evidence_pass"] = "PASS" if qc_evidence_pass else "FAIL"
+        r["qc_evidence_reason"] = "" if qc_evidence_pass else "missing_evidence_trace"
+
+        if qc_schema_pass and qc_biological_pass and qc_linkage_pass and qc_evidence_pass:
+            r["qc_overall_status"] = "PASS"
+            r["qc_overall_reason"] = "training_ready"
+        elif qc_linkage_pass and qc_evidence_pass:
+            r["qc_overall_status"] = "REVIEW"
+            reasons = []
+            if not qc_schema_pass:
+                reasons.append("schema_incomplete")
+            if not qc_biological_pass:
+                reasons.append("missing_response")
+            r["qc_overall_reason"] = "|".join(reasons)
+        else:
+            r["qc_overall_status"] = "FAIL"
+            r["qc_overall_reason"] = "insufficient_linkage_or_evidence"
+
+        qc_rows.append(r)
+
+    return pd.DataFrame(qc_rows)
+
+
+def write_empty_outputs(curated_dir, runs_dir, summary_path, status):
+    empty_df = pd.DataFrame(columns=QC_COLUMNS)
+
+    qc_path = os.path.join(curated_dir, "translation_dataset_qc_v1.csv")
+    pass_path = os.path.join(curated_dir, "translation_dataset_pass_v1.csv")
+    review_path = os.path.join(curated_dir, "translation_dataset_review_v1.csv")
+    fail_path = os.path.join(curated_dir, "translation_dataset_fail_v1.csv")
+
+    empty_df.to_csv(qc_path, index=False)
+    empty_df.to_csv(pass_path, index=False)
+    empty_df.to_csv(review_path, index=False)
+    empty_df.to_csv(fail_path, index=False)
+
+    summary = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "status": status,
+        "total_rows": 0,
+        "pass_rows": 0,
+        "review_rows": 0,
+        "fail_rows": 0,
+        "pass_rate_percent": 0,
+        "review_rate_percent": 0,
+        "fail_rate_percent": 0,
+    }
+
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=2)
+
+    empty_df.to_csv(os.path.join(runs_dir, "translation_dataset_qc_v1.csv"), index=False)
+    empty_df.to_csv(os.path.join(runs_dir, "translation_dataset_pass_v1.csv"), index=False)
+    empty_df.to_csv(os.path.join(runs_dir, "translation_dataset_review_v1.csv"), index=False)
+    empty_df.to_csv(os.path.join(runs_dir, "translation_dataset_fail_v1.csv"), index=False)
+
+    with open(os.path.join(runs_dir, "translation_dataset_qc_summary_v1.json"), "w") as f:
+        json.dump(summary, f, indent=2)
+
+    print(summary)
 
 
 if __name__ == "__main__":
@@ -41,116 +157,30 @@ if __name__ == "__main__":
     fail_path = os.path.join(curated_dir, "translation_dataset_fail_v1.csv")
     summary_path = os.path.join(curated_dir, "translation_dataset_qc_summary_v1.json")
 
-    print("Loading master row dataset...")
+    print("Loading master dataset...")
 
     if not os.path.exists(master_path) or os.path.getsize(master_path) == 0:
-        print("Master dataset missing or empty. Writing empty QC outputs.")
-
-        empty_df = pd.DataFrame(columns=QC_COLUMNS)
-
-        empty_df.to_csv(qc_path, index=False)
-        empty_df.to_csv(pass_path, index=False)
-        empty_df.to_csv(review_path, index=False)
-        empty_df.to_csv(fail_path, index=False)
-
-        summary = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "status": "NO_MASTER_ROWS",
-            "total_rows": 0,
-            "pass_rows": 0,
-            "review_rows": 0,
-            "fail_rows": 0,
-            "pass_rate_percent": 0,
-            "review_rate_percent": 0,
-            "fail_rate_percent": 0,
-        }
-
-        with open(summary_path, "w") as f:
-            json.dump(summary, f, indent=2)
-
-        empty_df.to_csv(os.path.join(runs_dir, "translation_dataset_qc_v1.csv"), index=False)
-        empty_df.to_csv(os.path.join(runs_dir, "translation_dataset_pass_v1.csv"), index=False)
-        empty_df.to_csv(os.path.join(runs_dir, "translation_dataset_review_v1.csv"), index=False)
-        empty_df.to_csv(os.path.join(runs_dir, "translation_dataset_fail_v1.csv"), index=False)
-
-        with open(os.path.join(runs_dir, "translation_dataset_qc_summary_v1.json"), "w") as f:
-            json.dump(summary, f, indent=2)
-
-        print("QC completed with no master rows.")
+        write_empty_outputs(curated_dir, runs_dir, summary_path, "NO_MASTER_ROWS")
         raise SystemExit(0)
 
     try:
         df = pd.read_csv(master_path)
     except pd.errors.EmptyDataError:
-        print("Master file has no columns. Writing empty QC outputs.")
-
-        empty_df = pd.DataFrame(columns=QC_COLUMNS)
-
-        empty_df.to_csv(qc_path, index=False)
-        empty_df.to_csv(pass_path, index=False)
-        empty_df.to_csv(review_path, index=False)
-        empty_df.to_csv(fail_path, index=False)
-
-        summary = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "status": "EMPTY_MASTER_FILE",
-            "total_rows": 0,
-            "pass_rows": 0,
-            "review_rows": 0,
-            "fail_rows": 0,
-            "pass_rate_percent": 0,
-            "review_rate_percent": 0,
-            "fail_rate_percent": 0,
-        }
-
-        with open(summary_path, "w") as f:
-            json.dump(summary, f, indent=2)
-
-        print("QC completed with empty master file.")
+        write_empty_outputs(curated_dir, runs_dir, summary_path, "EMPTY_MASTER_FILE")
         raise SystemExit(0)
 
-    print("Master rows:", len(df))
-
     if len(df) == 0:
-        print("Master dataset has zero rows. Writing empty QC outputs.")
-
-        empty_df = df.copy()
-        for col in QC_COLUMNS:
-            if col not in empty_df.columns:
-                empty_df[col] = ""
-
-        empty_df.to_csv(qc_path, index=False)
-        empty_df.to_csv(pass_path, index=False)
-        empty_df.to_csv(review_path, index=False)
-        empty_df.to_csv(fail_path, index=False)
-
-        summary = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "status": "ZERO_MASTER_ROWS",
-            "total_rows": 0,
-            "pass_rows": 0,
-            "review_rows": 0,
-            "fail_rows": 0,
-            "pass_rate_percent": 0,
-            "review_rate_percent": 0,
-            "fail_rate_percent": 0,
-        }
-
-        with open(summary_path, "w") as f:
-            json.dump(summary, f, indent=2)
-
-        print("QC completed with zero rows.")
+        write_empty_outputs(curated_dir, runs_dir, summary_path, "ZERO_MASTER_ROWS")
         raise SystemExit(0)
 
     print("Running QC...")
     qc_df = run_qc(df)
 
+    pass_df = qc_df[qc_df["qc_overall_status"] == "PASS"]
+    review_df = qc_df[qc_df["qc_overall_status"] == "REVIEW"]
+    fail_df = qc_df[qc_df["qc_overall_status"] == "FAIL"]
+
     qc_df.to_csv(qc_path, index=False)
-
-    pass_df = qc_df[qc_df["qc_overall_status"] == "PASS"].copy()
-    review_df = qc_df[qc_df["qc_overall_status"] == "REVIEW"].copy()
-    fail_df = qc_df[qc_df["qc_overall_status"] == "FAIL"].copy()
-
     pass_df.to_csv(pass_path, index=False)
     review_df.to_csv(review_path, index=False)
     fail_df.to_csv(fail_path, index=False)
@@ -160,29 +190,14 @@ if __name__ == "__main__":
     summary = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "status": "QC_COMPLETE",
-        "total_rows": int(total),
-        "pass_rows": int(len(pass_df)),
-        "review_rows": int(len(review_df)),
-        "fail_rows": int(len(fail_df)),
+        "total_rows": total,
+        "pass_rows": len(pass_df),
+        "review_rows": len(review_df),
+        "fail_rows": len(fail_df),
         "pass_rate_percent": round((len(pass_df) / total) * 100, 2) if total else 0,
-        "review_rate_percent": round((len(review_df) / total) * 100, 2) if total else 0,
-        "fail_rate_percent": round((len(fail_df) / total) * 100, 2) if total else 0,
     }
 
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
 
-    qc_df.to_csv(os.path.join(runs_dir, "translation_dataset_qc_v1.csv"), index=False)
-    pass_df.to_csv(os.path.join(runs_dir, "translation_dataset_pass_v1.csv"), index=False)
-    review_df.to_csv(os.path.join(runs_dir, "translation_dataset_review_v1.csv"), index=False)
-    fail_df.to_csv(os.path.join(runs_dir, "translation_dataset_fail_v1.csv"), index=False)
-
-    with open(os.path.join(runs_dir, "translation_dataset_qc_summary_v1.json"), "w") as f:
-        json.dump(summary, f, indent=2)
-
-    print("Saved QC dataset:", qc_path)
-    print("Saved PASS dataset:", pass_path)
-    print("Saved REVIEW dataset:", review_path)
-    print("Saved FAIL dataset:", fail_path)
-    print("Saved QC summary:", summary_path)
     print(summary)
