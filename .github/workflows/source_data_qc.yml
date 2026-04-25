@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  gdsc-source-qc:
+  source-qc:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,12 +28,15 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pandas numpy
+          pip install pandas numpy openpyxl
 
-      - name: Show GDSC raw folder
+      - name: Show raw source folders
         run: |
-          echo "Checking raw GDSC folder..."
-          find data_sources/gdsc/raw -maxdepth 2 -type f | sort || true
+          echo "GDSC raw files:"
+          find data_sources/gdsc/raw -maxdepth 1 -type f -print | sort || true
+
+          echo "DepMap raw files:"
+          find data_sources/depmap_ccle/raw -maxdepth 1 -type f -print | sort || true
 
       - name: Run GDSC normalization
         env:
@@ -53,7 +56,7 @@ jobs:
         run: |
           python scripts/qc/run_gdsc_qc.py
 
-      - name: Verify QC outputs
+      - name: Verify GDSC QC outputs
         run: |
           test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_qc_full_v1.csv
           test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_pass_training_grade_v1.csv
@@ -61,34 +64,47 @@ jobs:
           test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_fail_v1.csv
           test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_qc_summary_v1.json
           test -f outputs/training_ready/gdsc/gdsc_pass_training_grade_v1.csv
-          echo "QC outputs verified."
+          echo "GDSC QC outputs verified."
           cat outputs/qc/gdsc/GDSC_QC_v1/gdsc_qc_summary_v1.json
+
+      - name: Run DepMap structural source QC
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/qc/run_depmap_qc.py
+
+      - name: Verify DepMap QC outputs
+        run: |
+          test -f outputs/qc/depmap_ccle/DepMap_QC_v1/depmap_qc_file_summary_v1.csv
+          test -f outputs/qc/depmap_ccle/DepMap_QC_v1/depmap_qc_summary_v1.json
+          echo "DepMap QC outputs verified."
+          cat outputs/qc/depmap_ccle/DepMap_QC_v1/depmap_qc_summary_v1.json
 
       - name: Track source QC outputs with Git LFS
         run: |
           git lfs install
 
-          git lfs track "data_sources/gdsc/raw/*.csv"
-          git lfs track "outputs/processed/gdsc/*.csv"
-          git lfs track "outputs/qc/gdsc/GDSC_QC_v1/*.csv"
-          git lfs track "outputs/training_ready/gdsc/*.csv"
+          git lfs track "data_sources/**/*.csv"
+          git lfs track "outputs/**/*.csv"
+          git lfs track "outputs/**/*.json"
 
           git add .gitattributes
 
-      - name: Commit source QC outputs with Git LFS
+      - name: Commit source QC outputs
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
+          git add .gitattributes
           git add outputs/processed/gdsc/
           git add outputs/qc/gdsc/GDSC_QC_v1/
           git add outputs/training_ready/gdsc/
-          git add .gitattributes
+          git add outputs/qc/depmap_ccle/DepMap_QC_v1/
 
           if git diff --cached --quiet; then
             echo "No source QC changes to commit."
           else
-            git commit -m "Run GDSC normalization and source QC with LFS outputs"
+            git commit -m "Run GDSC and DepMap source QC"
             git push
           fi
 
@@ -96,8 +112,9 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: gdsc-source-qc-outputs
+          name: source-qc-outputs
           path: |
             outputs/processed/gdsc/
             outputs/qc/gdsc/GDSC_QC_v1/
             outputs/training_ready/gdsc/
+            outputs/qc/depmap_ccle/DepMap_QC_v1/
