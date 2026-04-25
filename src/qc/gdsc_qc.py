@@ -1,5 +1,3 @@
-# src/qc/gdsc_qc.py
-
 import os
 import json
 import hashlib
@@ -37,7 +35,7 @@ def sha256_file(path):
 
 
 def add_flag(df, mask, flag, severity):
-    mask = mask.fillna(False)
+    mask = pd.Series(mask, index=df.index).fillna(False)
 
     df.loc[mask, "gdsc_qc_flags"] = (
         df.loc[mask, "gdsc_qc_flags"].astype(str) + flag + ";"
@@ -84,7 +82,6 @@ def run_gdsc_qc(df):
             df[col] = np.nan
             df = add_flag(df, pd.Series(True, index=df.index), f"MISSING_COLUMN_{col}", "FAIL")
 
-    # Required source-level fields
     for col in required_cols:
         df = add_flag(
             df,
@@ -93,7 +90,6 @@ def run_gdsc_qc(df):
             "FAIL",
         )
 
-    # GDSC should be in vitro
     df = add_flag(
         df,
         df["outcome_level"].astype(str).str.strip().str.lower() != "in_vitro",
@@ -101,7 +97,6 @@ def run_gdsc_qc(df):
         "FAIL",
     )
 
-    # Drug sensitivity response must be numeric
     df["_gdsc_response_numeric"] = df["response_value_standard"].apply(safe_float)
 
     df = add_flag(
@@ -111,7 +106,6 @@ def run_gdsc_qc(df):
         "FAIL",
     )
 
-    # Biological range checks
     metric = df["response_metric_standard"].astype(str).str.strip()
 
     ic50_mask = metric.isin(["IC50_uM", "IC50", "ic50_uM", "ic50"])
@@ -147,8 +141,8 @@ def run_gdsc_qc(df):
         "FAIL",
     )
 
-    # Unknown response metric = review, not fail
     known_metrics = ic50_mask | ln_ic50_mask | viability_mask | auc_mask
+
     df = add_flag(
         df,
         ~known_metrics,
@@ -156,7 +150,6 @@ def run_gdsc_qc(df):
         "REVIEW",
     )
 
-    # Optional but important fields
     optional_review_cols = [
         "tissue_context",
         "dose_normalized_uM",
@@ -175,7 +168,6 @@ def run_gdsc_qc(df):
                 "REVIEW",
             )
 
-    # Duplicate checks
     dup_cols = [
         c for c in [
             "drug_name_standard",
@@ -196,7 +188,12 @@ def run_gdsc_qc(df):
         )
 
     conflict_cols = [
-        c for c in ["drug_name_standard", "cell_line_name", "model_name", "response_metric_standard"]
+        c for c in [
+            "drug_name_standard",
+            "cell_line_name",
+            "model_name",
+            "response_metric_standard",
+        ]
         if c in df.columns
     ]
 
@@ -254,10 +251,10 @@ def write_gdsc_qc_outputs(qc_df, out_dir, input_path=None):
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "input_path": input_path,
         "input_sha256": sha256_file(input_path) if input_path and os.path.exists(input_path) else None,
-        "total_rows": total,
-        "pass_rows": len(pass_df),
-        "review_rows": len(review_df),
-        "fail_rows": len(fail_df),
+        "total_rows": int(total),
+        "pass_rows": int(len(pass_df)),
+        "review_rows": int(len(review_df)),
+        "fail_rows": int(len(fail_df)),
         "pass_rate_percent": round((len(pass_df) / total) * 100, 2) if total else 0,
         "review_rate_percent": round((len(review_df) / total) * 100, 2) if total else 0,
         "fail_rate_percent": round((len(fail_df) / total) * 100, 2) if total else 0,
@@ -275,5 +272,4 @@ def write_gdsc_qc_outputs(qc_df, out_dir, input_path=None):
         json.dump(summary, f, indent=2)
 
     print(json.dumps(summary, indent=2))
-
     return summary
