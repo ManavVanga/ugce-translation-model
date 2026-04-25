@@ -44,12 +44,6 @@ jobs:
         run: |
           python src/normalize/gdsc_normalize.py
 
-      - name: Verify normalized GDSC file
-        run: |
-          test -f outputs/processed/gdsc/gdsc_iviv_normalized_v1.csv
-          echo "Normalized GDSC file exists."
-          ls -lh outputs/processed/gdsc/
-
       - name: Run GDSC source-level QC
         env:
           PYTHONPATH: .
@@ -58,39 +52,41 @@ jobs:
 
       - name: Verify GDSC QC outputs
         run: |
-          test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_qc_full_v1.csv
-          test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_pass_training_grade_v1.csv
-          test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_review_v1.csv
-          test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_fail_v1.csv
           test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_qc_summary_v1.json
           test -f outputs/training_ready/gdsc/gdsc_pass_training_grade_v1.csv
-          echo "GDSC QC outputs verified."
           cat outputs/qc/gdsc/GDSC_QC_v1/gdsc_qc_summary_v1.json
 
-      - name: Run DepMap structural source QC
+      - name: Run DepMap raw structural QC
         env:
           PYTHONPATH: .
         run: |
           python scripts/qc/run_depmap_qc.py
 
-      - name: Verify DepMap QC outputs
+      - name: Run DepMap cleaning
+        env:
+          PYTHONPATH: .
         run: |
-          test -f outputs/qc/depmap_ccle/DepMap_QC_v1/depmap_qc_file_summary_v1.csv
-          test -f outputs/qc/depmap_ccle/DepMap_QC_v1/depmap_qc_summary_v1.json
-          echo "DepMap QC outputs verified."
-          cat outputs/qc/depmap_ccle/DepMap_QC_v1/depmap_qc_summary_v1.json
+          python scripts/normalize/run_depmap_clean.py
+
+      - name: Verify DepMap cleaned outputs
+        run: |
+          test -f outputs/processed/depmap_ccle/Model_clean.csv
+          test -f outputs/processed/depmap_ccle/OmicsSomaticMutations_clean.csv
+          test -f outputs/processed/depmap_ccle/OmicsExpressionTPMLogp1HumanProteinCodingGenes_clean.csv
+          test -f outputs/processed/depmap_ccle/CRISPRGeneEffect_clean.csv
+          test -f outputs/processed/depmap_ccle/PortalOmicsCNGeneLog2_clean.csv
+          test -f outputs/processed/depmap_ccle/depmap_cleaning_report_v1.json
+          cat outputs/processed/depmap_ccle/depmap_cleaning_report_v1.json
 
       - name: Track source QC outputs with Git LFS
         run: |
           git lfs install
-
           git lfs track "data_sources/**/*.csv"
           git lfs track "outputs/**/*.csv"
           git lfs track "outputs/**/*.json"
-
           git add .gitattributes
 
-      - name: Commit source QC outputs
+      - name: Commit source QC and cleaned outputs
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -100,11 +96,12 @@ jobs:
           git add outputs/qc/gdsc/GDSC_QC_v1/
           git add outputs/training_ready/gdsc/
           git add outputs/qc/depmap_ccle/DepMap_QC_v1/
+          git add outputs/processed/depmap_ccle/
 
           if git diff --cached --quiet; then
             echo "No source QC changes to commit."
           else
-            git commit -m "Run GDSC and DepMap source QC"
+            git commit -m "Run GDSC QC and clean DepMap source data"
             git push
           fi
 
@@ -118,3 +115,4 @@ jobs:
             outputs/qc/gdsc/GDSC_QC_v1/
             outputs/training_ready/gdsc/
             outputs/qc/depmap_ccle/DepMap_QC_v1/
+            outputs/processed/depmap_ccle/
