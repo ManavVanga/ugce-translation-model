@@ -3,3 +3,7 @@ data_sources/**/*.tsv filter=lfs diff=lfs merge=lfs -text
 data_sources/**/*.xlsx filter=lfs diff=lfs merge=lfs -text
 data_sources/**/*.gz filter=lfs diff=lfs merge=lfs -text
 data_sources/**/*.zip filter=lfs diff=lfs merge=lfs -text
+data_sources/gdsc/raw/*.csv filter=lfs diff=lfs merge=lfs -text
+outputs/processed/gdsc/*.csv filter=lfs diff=lfs merge=lfs -text
+outputs/qc/gdsc/GDSC_QC_v1/*.csv filter=lfs diff=lfs merge=lfs -text
+outputs/training_ready/gdsc/*.csv filter=lfs diff=lfs merge=lfs -text

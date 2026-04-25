@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-04-25 00:49:28",
+  "status": "GDSC_NORMALIZATION_COMPLETE",
+  "raw_path": "data_sources/gdsc/raw/gdsc_drug_response.csv",
+  "raw_sha256": "9d6dc82b9a072bb00b6139dcd6c4c11de1e047f210382fb726e92ab8dd0eae2a",
+  "output_path": "outputs/processed/gdsc/gdsc_iviv_normalized_v1.csv",
+  "raw_rows": 242036,
+  "normalized_rows": 242036,
+  "detected_columns": {
+    "drug_col": "DRUG_NAME",
+    "drug_id_col": "DRUG_ID",
+    "cell_col": "CELL_LINE_NAME",
+    "cell_id_col": "COSMIC_ID",
+    "tissue_col": "TCGA_DESC",
+    "response_col": "LN_IC50",
+    "response_metric_standard": "LN_IC50"
+  }
+}
