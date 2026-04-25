@@ -90,8 +90,23 @@ jobs:
           test -f outputs/mapping/gdsc_depmap/GDSC_DepMap_mapped_training_base_v1.csv
           test -f outputs/mapping/gdsc_depmap/GDSC_DepMap_unmatched_v1.csv
           test -f outputs/mapping/gdsc_depmap/DepMap_model_lookup_v1.csv
+          test -f outputs/mapping/gdsc_depmap/DepMap_model_lookup_raw_v1.csv
           test -f outputs/mapping/gdsc_depmap/GDSC_DepMap_mapping_summary_v1.json
           cat outputs/mapping/gdsc_depmap/GDSC_DepMap_mapping_summary_v1.json
+
+      - name: Build GDSC DepMap molecular training dataset
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/features/run_gdsc_depmap_molecular.py
+
+      - name: Verify molecular training outputs
+        run: |
+          test -f outputs/training_ready/gdsc_depmap_molecular/gdsc_depmap_molecular_full_v1.csv
+          test -f outputs/training_ready/gdsc_depmap_molecular/gdsc_depmap_molecular_training_ready_v1.csv
+          test -f outputs/training_ready/gdsc_depmap_molecular/gdsc_depmap_molecular_review_v1.csv
+          test -f outputs/training_ready/gdsc_depmap_molecular/gdsc_depmap_molecular_qc_summary_v1.json
+          cat outputs/training_ready/gdsc_depmap_molecular/gdsc_depmap_molecular_qc_summary_v1.json
 
       - name: Track source QC outputs with Git LFS
         run: |
@@ -101,7 +116,7 @@ jobs:
           git lfs track "outputs/**/*.json"
           git add .gitattributes
 
-      - name: Commit source QC cleaned and mapping outputs
+      - name: Commit source QC cleaned mapping and molecular outputs
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -113,11 +128,12 @@ jobs:
           git add outputs/qc/depmap_ccle/DepMap_QC_v1/
           git add outputs/processed/depmap_ccle/
           git add outputs/mapping/gdsc_depmap/
+          git add outputs/training_ready/gdsc_depmap_molecular/
 
           if git diff --cached --quiet; then
             echo "No source QC changes to commit."
           else
-            git commit -m "Run GDSC QC DepMap cleaning and mapping"
+            git commit -m "Build GDSC DepMap molecular training dataset"
             git push
           fi
 
@@ -133,3 +149,4 @@ jobs:
             outputs/qc/depmap_ccle/DepMap_QC_v1/
             outputs/processed/depmap_ccle/
             outputs/mapping/gdsc_depmap/
+            outputs/training_ready/gdsc_depmap_molecular/
