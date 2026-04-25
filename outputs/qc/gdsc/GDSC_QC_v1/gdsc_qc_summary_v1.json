@@ -1,20 +1,25 @@
 {
-  "qc_version": "GDSC_QC_v1",
-  "timestamp": "2026-04-25 00:49:37",
+  "qc_version": "GDSC_QC_v1_1",
+  "timestamp": "2026-04-25 00:57:37",
   "input_path": "outputs/processed/gdsc/gdsc_iviv_normalized_v1.csv",
   "input_sha256": "cf6ad0cebb1105e9af532cd7c1917c5ed1a0153fb38cc3a69b89c21540eb553a",
   "total_rows": 242036,
-  "pass_rows": 0,
-  "review_rows": 242036,
+  "pass_rows": 228395,
+  "review_rows": 13641,
   "fail_rows": 0,
-  "pass_rate_percent": 0.0,
-  "review_rate_percent": 100.0,
+  "pass_rate_percent": 94.36,
+  "review_rate_percent": 5.64,
   "fail_rate_percent": 0.0,
   "flag_counts": {
-    "MISSING_OPTIONAL_dose_normalized_uM": 242036,
-    "MISSING_OPTIONAL_exposure_time_hours": 242036,
-    "MISSING_OPTIONAL_tissue_context": 1067,
-    "CONFLICTING_DUPLICATE_RESPONSE_REVIEW": 12576
+    "MISSING_TISSUE_CONTEXT": 1067,
+    "CONFLICTING_DUPLICATE_RESPONSE": 12576
+  },
+  "quality_policy": {
+    "dose_time_missing_policy": "Not used as REVIEW/FAIL for GDSC because GDSC rows are fitted drug-response summaries, not raw dose-time measurements.",
+    "conflicting_duplicate_policy": "REVIEW; excluded from training-grade PASS until resolved.",
+    "missing_tissue_policy": "REVIEW; excluded from training-grade PASS until recovered.",
+    "unknown_metric_policy": "FAIL.",
+    "invalid_numeric_response_policy": "FAIL."
   },
   "outputs": {
     "qc_full": "outputs/qc/gdsc/GDSC_QC_v1/gdsc_qc_full_v1.csv",
