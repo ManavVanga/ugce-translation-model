@@ -39,6 +39,7 @@ def first_existing_col(df, candidates):
 
 def build_depmap_lookup(model_df):
     model_id_col = first_existing_col(model_df, ["ModelID", "DepMap_ID", "DepMapID"])
+
     if model_id_col is None:
         raise ValueError("DepMap Model file has no ModelID/DepMap_ID column.")
 
@@ -75,7 +76,6 @@ def build_depmap_lookup(model_df):
     if len(lookup) == 0:
         raise ValueError("No usable DepMap model-name lookup keys generated.")
 
-    # If same normalized key maps to multiple ModelIDs, mark ambiguous.
     key_counts = (
         lookup.groupby("normalized_key")["depmap_model_id"]
         .nunique()
@@ -145,7 +145,6 @@ def run_gdsc_depmap_mapping(
         "gdsc_depmap_mapping_status"
     ] = "REVIEW_AMBIGUOUS"
 
-    # Training base = only uniquely mapped rows
     mapped_training = mapped[
         mapped["gdsc_depmap_mapping_status"] == "MATCHED_UNIQUE"
     ].copy()
