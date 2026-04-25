@@ -78,6 +78,21 @@ jobs:
           test -f outputs/processed/depmap_ccle/depmap_cleaning_report_v1.json
           cat outputs/processed/depmap_ccle/depmap_cleaning_report_v1.json
 
+      - name: Run GDSC to DepMap mapping
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/linking/run_gdsc_depmap_mapping.py
+
+      - name: Verify GDSC DepMap mapping outputs
+        run: |
+          test -f outputs/mapping/gdsc_depmap/GDSC_DepMap_mapping_v1.csv
+          test -f outputs/mapping/gdsc_depmap/GDSC_DepMap_mapped_training_base_v1.csv
+          test -f outputs/mapping/gdsc_depmap/GDSC_DepMap_unmatched_v1.csv
+          test -f outputs/mapping/gdsc_depmap/DepMap_model_lookup_v1.csv
+          test -f outputs/mapping/gdsc_depmap/GDSC_DepMap_mapping_summary_v1.json
+          cat outputs/mapping/gdsc_depmap/GDSC_DepMap_mapping_summary_v1.json
+
       - name: Track source QC outputs with Git LFS
         run: |
           git lfs install
@@ -86,7 +101,7 @@ jobs:
           git lfs track "outputs/**/*.json"
           git add .gitattributes
 
-      - name: Commit source QC and cleaned outputs
+      - name: Commit source QC cleaned and mapping outputs
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -97,11 +112,12 @@ jobs:
           git add outputs/training_ready/gdsc/
           git add outputs/qc/depmap_ccle/DepMap_QC_v1/
           git add outputs/processed/depmap_ccle/
+          git add outputs/mapping/gdsc_depmap/
 
           if git diff --cached --quiet; then
             echo "No source QC changes to commit."
           else
-            git commit -m "Run GDSC QC and clean DepMap source data"
+            git commit -m "Run GDSC QC DepMap cleaning and mapping"
             git push
           fi
 
@@ -116,3 +132,4 @@ jobs:
             outputs/training_ready/gdsc/
             outputs/qc/depmap_ccle/DepMap_QC_v1/
             outputs/processed/depmap_ccle/
+            outputs/mapping/gdsc_depmap/
