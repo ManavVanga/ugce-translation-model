@@ -1,0 +1,59 @@
+name: Source Data QC (GDSC)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  gdsc-qc:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pandas numpy
+
+      - name: Verify GDSC input exists
+        run: |
+          if [ ! -f "outputs/processed/gdsc/gdsc_iviv_normalized_v1.csv" ]; then
+            echo "GDSC normalized file not found"
+            exit 1
+          fi
+          echo "GDSC input found"
+
+      - name: Run GDSC Source QC
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/qc/run_gdsc_qc.py
+
+      - name: Copy PASS to training_ready
+        run: |
+          mkdir -p outputs/training_ready/gdsc
+          cp outputs/qc/gdsc/GDSC_QC_v1/gdsc_pass_training_grade_v1.csv \
+             outputs/training_ready/gdsc/gdsc_pass_training_grade_v1.csv
+
+      - name: Commit QC outputs
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add outputs/qc/gdsc/GDSC_QC_v1/
+          git add outputs/training_ready/gdsc/
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Run GDSC source QC and generate PASS dataset"
+            git push
+          fi
