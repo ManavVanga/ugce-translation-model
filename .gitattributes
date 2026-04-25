@@ -7,3 +7,9 @@ data_sources/gdsc/raw/*.csv filter=lfs diff=lfs merge=lfs -text
 outputs/processed/gdsc/*.csv filter=lfs diff=lfs merge=lfs -text
 outputs/qc/gdsc/GDSC_QC_v1/*.csv filter=lfs diff=lfs merge=lfs -text
 outputs/training_ready/gdsc/*.csv filter=lfs diff=lfs merge=lfs -text
+data_sources/**/*.txt filter=lfs diff=lfs merge=lfs -text
+data_sources/**/*.html filter=lfs diff=lfs merge=lfs -text
+data_sources/**/*.json filter=lfs diff=lfs merge=lfs -text
+data_sources/**/*.tar.gz filter=lfs diff=lfs merge=lfs -text
+data_sources/**/*.sqlite filter=lfs diff=lfs merge=lfs -text
+data_sources/**/*.db filter=lfs diff=lfs merge=lfs -text
