@@ -1,4 +1,4 @@
-name: Source Data QC (GDSC)
+name: Source Data QC
 
 on:
   workflow_dispatch:
@@ -7,12 +7,18 @@ permissions:
   contents: write
 
 jobs:
-  gdsc-qc:
+  gdsc-source-qc:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repo with LFS
         uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Pull Git LFS files
+        run: |
+          git lfs pull
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -21,39 +27,65 @@ jobs:
 
       - name: Install dependencies
         run: |
+          pip install -r requirements.txt
           pip install pandas numpy
 
-      - name: Verify GDSC input exists
+      - name: Show GDSC raw folder
         run: |
-          if [ ! -f "outputs/processed/gdsc/gdsc_iviv_normalized_v1.csv" ]; then
-            echo "GDSC normalized file not found"
-            exit 1
-          fi
-          echo "GDSC input found"
+          echo "Checking raw GDSC folder..."
+          find data_sources/gdsc/raw -maxdepth 2 -type f | sort || true
 
-      - name: Run GDSC Source QC
+      - name: Run GDSC normalization
+        env:
+          PYTHONPATH: .
+        run: |
+          python src/normalize/gdsc_normalize.py
+
+      - name: Verify normalized GDSC file
+        run: |
+          test -f outputs/processed/gdsc/gdsc_iviv_normalized_v1.csv
+          echo "Normalized GDSC file exists."
+          ls -lh outputs/processed/gdsc/
+
+      - name: Run GDSC source-level QC
         env:
           PYTHONPATH: .
         run: |
           python scripts/qc/run_gdsc_qc.py
 
-      - name: Copy PASS to training_ready
+      - name: Verify QC outputs
         run: |
-          mkdir -p outputs/training_ready/gdsc
-          cp outputs/qc/gdsc/GDSC_QC_v1/gdsc_pass_training_grade_v1.csv \
-             outputs/training_ready/gdsc/gdsc_pass_training_grade_v1.csv
+          test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_qc_full_v1.csv
+          test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_pass_training_grade_v1.csv
+          test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_review_v1.csv
+          test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_fail_v1.csv
+          test -f outputs/qc/gdsc/GDSC_QC_v1/gdsc_qc_summary_v1.json
+          test -f outputs/training_ready/gdsc/gdsc_pass_training_grade_v1.csv
+          echo "QC outputs verified."
+          cat outputs/qc/gdsc/GDSC_QC_v1/gdsc_qc_summary_v1.json
 
-      - name: Commit QC outputs
+      - name: Commit source QC outputs
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
+          git add outputs/processed/gdsc/
           git add outputs/qc/gdsc/GDSC_QC_v1/
           git add outputs/training_ready/gdsc/
 
           if git diff --cached --quiet; then
-            echo "No changes to commit"
+            echo "No source QC changes to commit."
           else
-            git commit -m "Run GDSC source QC and generate PASS dataset"
+            git commit -m "Run GDSC normalization and source QC"
             git push
           fi
+
+      - name: Upload source QC artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gdsc-source-qc-outputs
+          path: |
+            outputs/processed/gdsc/
+            outputs/qc/gdsc/GDSC_QC_v1/
+            outputs/training_ready/gdsc/
